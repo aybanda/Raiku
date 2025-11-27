@@ -1,52 +1,67 @@
 import { GoogleGenAI } from "@google/genai";
-import { SimulationStats, ExecutionMode } from '../types';
+import { SimulationStats, ExecutionMode, Scenario } from '../types';
 
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 export const analyzeSimulation = async (
   legacyStats: SimulationStats,
-  raikuStats: SimulationStats
+  raikuStats: SimulationStats,
+  scenario: Scenario
 ): Promise<string> => {
   
+  // Calculate specific metrics for the prompt
+  const legacyDropRate = legacyStats.totalTx > 0 ? ((legacyStats.droppedTx / legacyStats.totalTx) * 100).toFixed(1) : "0";
+  const mevSaved = (legacyStats.mevLost - raikuStats.mevLost).toLocaleString();
+  
   const prompt = `
-    Act as a senior blockchain economist and systems architect researching Solana blockspace markets.
+    IDENTITY: You are the "Ackermann Economic Engine", a specialized AI module for the Raiku Protocol.
     
-    Analyze the following simulation data comparing "Legacy Probabilistic Execution" vs "Raiku Deterministic Execution".
+    CONTEXT:
+    You are analyzing live telemetry from a comparative simulation between:
+    1. LEGACY SOLANA: Probabilistic execution, subject to jitter, spam, and non-deterministic auctions.
+    2. RAIKU: Deterministic execution using Ahead-of-Time (AOT) slot reservations and guaranteed ordering.
+
+    CURRENT SIMULATION SCENARIO: ${scenario}
     
-    DATA:
-    Legacy (Standard Solana):
-    - Transaction Drop Rate: ${((legacyStats.droppedTx / legacyStats.totalTx) * 100).toFixed(1)}%
-    - Network Jitter: ${legacyStats.jitter}ms
-    - Simulated MEV Loss: $${legacyStats.mevLost.toLocaleString()}
+    TELEMETRY DATA:
+    [Legacy Lane]
+    - Drop Rate: ${legacyDropRate}%
+    - MEV/Slippage Loss: $${legacyStats.mevLost.toLocaleString()}
+    - Jitter: ${legacyStats.jitter}ms
     
-    Raiku (Deterministic/AOT):
-    - Transaction Drop Rate: ${((raikuStats.droppedTx / raikuStats.totalTx) * 100).toFixed(1)}%
-    - Network Jitter: ${raikuStats.jitter}ms (Guaranteed Slots)
-    - Simulated MEV Loss: $${raikuStats.mevLost.toLocaleString()}
+    [Raiku Lane]
+    - Drop Rate: 0.0% (Guaranteed Inclusion)
+    - MEV/Slippage Loss: $0 (Pre-ordered execution)
+    - Slot Utilization: ${raikuStats.slotsUtilized}%
     
-    TASK:
-    Provide a concise, high-impact executive summary (max 3 short paragraphs) explaining:
-    1. The financial impact of uncertainty (Legacy) on institutional traders.
-    2. How Raiku's Ahead-of-Time (AOT) slot reservations solve the "spray and pray" spam problem.
-    3. A projection of how this enables new financial primitives (e.g., deterministic liquidations).
+    OBJECTIVE:
+    Generate a high-fidelity "Execution Quality Report" for an institutional trader dashboard.
     
-    Tone: Professional, Technical, "Hacker-Hotel" vibe.
-    Do not use markdown bolding excessively.
+    OUTPUT FORMAT:
+    Produce 3 distinct sections (keep them concise):
+    
+    1. ⚠️ DIAGNOSIS: specific technical analysis of why Legacy Solana failed in this '${scenario}' scenario (e.g., mention "UDP packet loss", "JIT auction spam", "Searcher contention", or "Mempool chaos").
+    2. 🛡️ RAIKU MITIGATION: Explain how Raiku's AOT reservations and deterministic ordering solved the issue.
+    3. 💰 ALPHA PRESERVED: Comment on the economic value saved (mention the $${mevSaved} figure) by avoiding drops and toxic MEV.
+
+    TONE:
+    Cybernetic, Institutional, Technical. Use Raiku terminology (AOT, JIT, Ackermann, Determinism).
+    Do not use standard markdown headers (#). Use capitalized labels instead.
   `;
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-3-pro-preview', // Using the advanced reasoning model
+      model: 'gemini-3-pro-preview', 
       contents: prompt,
       config: {
-        temperature: 0.7,
-        thinkingConfig: { thinkingBudget: 1024 } // Utilizing thinking tokens for deeper economic analysis
+        temperature: 0.5,
+        thinkingConfig: { thinkingBudget: 2048 } // Use significant thinking budget for deep reasoning
       }
     });
 
-    return response.text || "Analysis complete. Waiting for data stream...";
+    return response.text || "Ackermann Node: Telemetry stream interrupted.";
   } catch (error) {
     console.error("Gemini analysis failed:", error);
-    return "The Ackermann Node is temporarily unreachable. AI Analysis offline.";
+    return "Ackermann Node: Uplink unstable. Connection to Raiku Mainnet failed.";
   }
 };
